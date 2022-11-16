@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+
+import rospy
+import pcl
+import numpy as np
+import ctypes
+import struct
+import math
+import sensor_msgs.point_cloud2 as pc2
+
+from sensor_msgs.msg import PointCloud2, PointField
+from std_msgs.msg import Header
+from random import randint
+import ros_numpy as rnp
+from numpy import linalg as la 
+from PIL import Image as im
+
+from mpl_toolkits import mplot3d
+import matplotlib.pyplot as plt
+
+class ObsDetector():
+    feed_width = 640
+    feed_height= 480
+
+    n_segs = 3
+    n_iter = 2
+    n_lpr = 20
+    th_seeds = 1.2#0.4
+    th_dist = 0#0.5
+
+    def __init__(self):
+        rospy.Subscriber("/camera/depth/color/points", PointCloud2, self.point_cloud_handler)
+        rospy.spin()
+
+    def ExtractInitialSeeds(self, point):
+        p_sort = point[np.lexsort(point[:,:3].T)][:self.n_lpr]
+        lpr = np.mean(p_sort[:,2])
+        cond = point[:,2] <(lpr+self.th_seeds)
+        return point[cond]
+
+    def main(self, seeds, point):
+        pg = seeds
+        cov = np.cov(pg[:,:3].T)
+        for i in range(self.n_iter):
+            # estimate plane
+            cov = np.cov(pg[:,:3].T)
+            s_mean = np.mean(pg[:,:3],axis=0)
+            U,sigma,VT= la.svd(cov)
+            normal = U[:,-1]
+            d = -np.dot(normal.T,s_mean)
+            # condition
+            th=self.th_dist - d
+            cond_pg = np.dot(normal,point[:,:3].T)<th
+            
+            pg = point[cond_pg]
+            png = point[~cond_pg]
+        return pg,png
+
+    def point_cloud_handler(self, point_cloud):
+        print('here')
+
+        xyz = np.array([[0,0,0]])
+        rgb = np.array([[0,0,0]])
+
+        #pc = pc2.read_points(point_cloud, skip_nans=True, field_names=("x", "y", "z"))
+        pc = pc2.read_points(point_cloud, skip_nans=True)
+        pts = list(pc)
+
+        print(len(pts))
+
+        for x in pts:
+            test = x[3]
+
+            s = struct.pack('>f' ,test)
+            i = struct.unpack('>l',s)[0]
+
+            pack = ctypes.c_uint32(i).value
+            r = (pack & 0x00FF0000)>> 16
+            g = (pack & 0x0000FF00)>> 8
+            b = (pack & 0x000000FF)
+            
+            xyz = np.append(xyz,[[x[0],x[1],x[2]]], axis = 0)
+            rgb = np.append(rgb,[[r,g,b]], axis = 0)
+
+        # print(rgb.shape)
+
+        # print('---')
+
+        # np_p = np.array( list(pc) )
+        # np_p = np_p[np_p[:,2]>-4]
+        # seeds = self.ExtractInitialSeeds(np_p)
+        # pg, png = self.main(seeds,np_p)
+        # print (pg.shape, png.shape)
+
+        # png = np.resize(png, (self.feed_height, self.feed_width, 3))
+        # imgdata = im.fromarray(png)
+        # if imgdata.mode != 'RGB':
+        #     imgdata = imgdata.convert('RGB')
+        # imgdata.save("image.png")
+        
+
+
+        # print(png)
+
+
+
+        # pc_np = rnp.point_cloud2.pointcloud2_to_xrgbyz_array(point_cloud,remove_nans=True)
+        # distance_array = np.zeros(shape=(pc_np.shape[0],1))
+        # for i in range(pc_np.shape[0]): 
+        #     distance = math.sqrt(pc_np[i,0]**2 + pc_np[i,1]**2 + pc_np[i,2]**2)
+        #     distance_array[i,0] = distance
+
+        # print("Min distance: " + str(np.amin(distance_array)))
+        # print("Max distance: " + str(np.amax(distance_array)))
+
+        # mean = np.mean(pc_np[:,2])
+        # sd = np.std(pc_np[:,2])
+        # data_ground = pc_np[(pc_np[:,2] < mean + 1.5*sd) & (pc_np[:,2] > mean - 1.5*sd)]
+        # data_wo_ground = pc_np[(pc_np[:,2] > mean + 1.5*sd) | (pc_np[:,2] < mean - 1.5*sd)]
+        
+
+
+if __name__ == '__main__':
+    rospy.init_node('listener', anonymous=True)
+    try:
+        detect = ObsDetector()
+    except KeyboardInterrupt:
+        print('closing')

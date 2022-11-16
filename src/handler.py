@@ -7,6 +7,9 @@ import numpy as np
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import PointCloud2, PointField
 
+# from cv_bridge import CvBridge, CvBridgeError
+# bridge = CvBridge()
+
 class DyanmicHandler():
     def __init__(self):
         rospy.Subscriber("/camera/depth/color/points", PointCloud2, self.pointclout_handler )
