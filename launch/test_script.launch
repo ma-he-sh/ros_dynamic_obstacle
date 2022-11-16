@@ -1,0 +1,3 @@
+<launch>
+    <node pkg="dynamic_obstacle" name="handler.py" type="handler.py" output="screen">
+</launch>
