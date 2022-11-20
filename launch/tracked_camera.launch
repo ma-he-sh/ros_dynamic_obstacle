@@ -1,0 +1,17 @@
+<launch>
+    <!-- realsense camera-->
+    <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
+        <arg name="align_depth" value="true"/>
+        <arg name="enable_sync" value="true"/>
+    </include>
+
+    <arg name="rate" default="5"/>
+
+    <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager"/>
+    <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="load rtabmap_ros/rgbd_sync nodelet_manager" output="screen">
+        <remap from="rgb/image" to="/camera/color/image_raw"/>
+        <remap from="depth/image" to="/camera/aligned_depth_to_color/image_raw"/>
+        <param name="approx_sync" value="false"/>
+        <param name="compressed_rate" type="double" value="$(arg rate)"/>
+    </node>
+</launch>
